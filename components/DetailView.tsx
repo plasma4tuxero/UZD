@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { SavedItem, Category, Language, Folder } from '../types';
-import { X, ExternalLink, Calendar, Tag, BrainCircuit, Folder as FolderIcon } from 'lucide-react';
+import { X, ExternalLink, Calendar, Tag, BrainCircuit, Folder as FolderIcon, Link as LinkIcon, FileText, Mic } from 'lucide-react';
 import CategoryBadge from './CategoryBadge';
 import { translations } from '../utils/translations';
 
@@ -25,13 +25,27 @@ const DetailView: React.FC<Props> = ({ item, onClose, onUpdateCategory, folders,
     <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-6 bg-black/60 dark:bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
       <div className="bg-white dark:bg-neutral-900 w-full max-w-5xl h-[90vh] sm:h-auto sm:max-h-[85vh] sm:rounded-2xl border border-slate-200 dark:border-neutral-800 shadow-2xl flex flex-col sm:flex-row overflow-hidden transition-all">
         
-        {/* Left: Media */}
-        <div className="w-full sm:w-1/2 bg-slate-100 dark:bg-black flex items-center justify-center relative group">
-           <img 
-             src={item.imageUrl} 
-             alt="Content" 
-             className="max-h-full max-w-full object-contain"
-           />
+        {/* Left: Media or Placeholder */}
+        <div className="w-full sm:w-1/2 bg-slate-100 dark:bg-black flex items-center justify-center relative group min-h-[300px]">
+           {item.imageUrl ? (
+               <img 
+                 src={item.imageUrl} 
+                 alt="Content" 
+                 className="max-h-full max-w-full object-contain"
+               />
+           ) : (
+               <div className="w-full h-full flex flex-col items-center justify-center p-12 bg-gradient-to-br from-blue-500/10 to-purple-500/10 text-center">
+                   <div className="w-20 h-20 bg-white/20 backdrop-blur rounded-full flex items-center justify-center mb-6 shadow-xl">
+                       <LinkIcon className="w-10 h-10 text-slate-600 dark:text-neutral-300" />
+                   </div>
+                   <h2 className="text-2xl font-bold text-slate-800 dark:text-neutral-200 line-clamp-3">
+                       {item.analysis?.visualDescription || "Link Content"}
+                   </h2>
+                   <p className="mt-4 text-slate-500 dark:text-neutral-400 text-sm max-w-xs break-all">
+                       {item.sourceUrl}
+                   </p>
+               </div>
+           )}
            <div className="absolute top-4 left-4">
              <button onClick={onClose} className="sm:hidden p-2 bg-black/50 backdrop-blur rounded-full text-white">
                <X className="w-5 h-5" />
@@ -40,9 +54,9 @@ const DetailView: React.FC<Props> = ({ item, onClose, onUpdateCategory, folders,
         </div>
 
         {/* Right: Analysis & Meta */}
-        <div className="w-full sm:w-1/2 flex flex-col h-full bg-white/95 dark:bg-neutral-900/95">
+        <div className="w-full sm:w-1/2 flex flex-col h-full bg-white/95 dark:bg-neutral-900/95 border-l border-slate-100 dark:border-neutral-800">
           {/* Header */}
-          <div className="p-6 border-b border-slate-100 dark:border-neutral-800 flex justify-between items-start">
+          <div className="p-6 border-b border-slate-100 dark:border-neutral-800 flex justify-between items-start bg-slate-50/50 dark:bg-black/20">
              <div>
                <div className="flex items-center gap-3 mb-2">
                  <CategoryBadge category={item.userCategory} customLabel={currentFolderName} size="md" lang={lang} />
@@ -71,7 +85,7 @@ const DetailView: React.FC<Props> = ({ item, onClose, onUpdateCategory, folders,
           </div>
 
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto p-6 space-y-8">
             
             {/* Quick Actions */}
             {item.sourceUrl && (
@@ -79,61 +93,66 @@ const DetailView: React.FC<Props> = ({ item, onClose, onUpdateCategory, folders,
                 href={item.sourceUrl} 
                 target="_blank" 
                 rel="noreferrer"
-                className="flex items-center justify-center gap-2 w-full py-2 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 border border-slate-200 dark:border-neutral-700 rounded-lg text-slate-700 dark:text-neutral-300 transition-colors text-sm font-medium"
+                className="flex items-center justify-center gap-2 w-full py-3 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-200 dark:border-blue-900/50 rounded-xl text-blue-700 dark:text-blue-300 transition-colors text-sm font-bold"
               >
                 <ExternalLink className="w-4 h-4" />
                 {t.detail.openSource}
               </a>
             )}
 
-            {/* AI Analysis */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-blue-500 dark:text-blue-400 uppercase tracking-wider flex items-center gap-2">
+            {/* Extracted Text Content (e.g. Recipe/Steps) */}
+            {item.analysis?.extractedTexts && item.analysis.extractedTexts.length > 0 && (
+                <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Summary / Details
+                    </h3>
+                    <div className="bg-slate-50 dark:bg-neutral-800/50 rounded-xl p-4 border border-slate-100 dark:border-neutral-800 text-sm text-slate-700 dark:text-neutral-300 space-y-2">
+                        {item.analysis.extractedTexts.map((text, i) => (
+                            <p key={i} className="leading-relaxed border-b border-slate-200 dark:border-neutral-700 last:border-0 pb-2 last:pb-0 border-dashed">
+                                • {text}
+                            </p>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Audio Transcription */}
+            {item.analysis?.transcription && (
+                <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        <Mic className="w-4 h-4" />
+                        Audio Transcription
+                    </h3>
+                    <div className="bg-slate-50 dark:bg-neutral-800/50 rounded-xl p-4 border border-slate-100 dark:border-neutral-800 text-sm text-slate-600 dark:text-neutral-400 italic leading-relaxed">
+                        "{item.analysis.transcription}"
+                    </div>
+                </div>
+            )}
+
+            {/* Entities */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-wider flex items-center gap-2">
                 <BrainCircuit className="w-4 h-4" /> 
                 {t.detail.analysisTitle}
               </h3>
-              
-              {/* Extracted Entities */}
-              <div className="grid gap-3">
+              <div className="grid gap-2">
                 {item.analysis?.detectedEntities.map((entity, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-neutral-800/50 rounded-lg border border-slate-200 dark:border-neutral-800">
+                  <div key={i} className="flex items-center justify-between p-3 bg-white dark:bg-neutral-900 rounded-lg border border-slate-200 dark:border-neutral-800 shadow-sm">
                     <div className="flex flex-col">
                       <span className="font-medium text-slate-700 dark:text-neutral-200">{entity.name}</span>
                       <span className="text-xs text-slate-500 dark:text-neutral-500">{entity.type}</span>
                     </div>
                     {entity.meta && (
-                      <span className="text-xs bg-slate-200 dark:bg-neutral-700 text-slate-600 dark:text-neutral-300 px-2 py-1 rounded">
+                      <span className="text-xs bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300 px-2 py-1 rounded border border-slate-200 dark:border-neutral-700">
                         {entity.meta}
                       </span>
                     )}
                   </div>
                 ))}
-                {item.analysis?.detectedEntities.length === 0 && (
+                {(!item.analysis?.detectedEntities || item.analysis.detectedEntities.length === 0) && (
                   <p className="text-sm text-slate-500 dark:text-neutral-500 italic">{t.detail.noEntities}</p>
                 )}
-              </div>
-            </div>
-
-            {/* Confidence & Classification */}
-            <div>
-              <h3 className="text-sm font-semibold text-slate-500 dark:text-neutral-400 mb-3 uppercase tracking-wider">{t.detail.confidence}</h3>
-              <div className="space-y-2">
-                 {Object.entries(item.analysis?.confidenceScores || {}).map(([cat, score]) => {
-                    if (cat === 'UNCATEGORIZED') return null;
-                    const percentage = Math.round((score as number) * 100);
-                    return (
-                      <div key={cat} className="flex items-center gap-3">
-                        <span className="text-xs w-24 text-slate-600 dark:text-neutral-400">{t.badges[cat as Category]}</span>
-                        <div className="flex-1 h-2 bg-slate-200 dark:bg-neutral-800 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full ${percentage > 50 ? 'bg-blue-500' : 'bg-slate-400 dark:bg-neutral-600'}`} 
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-slate-500 dark:text-neutral-500 w-8 text-right">{percentage}%</span>
-                      </div>
-                    );
-                 })}
               </div>
             </div>
 

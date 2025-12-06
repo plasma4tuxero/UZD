@@ -46,6 +46,7 @@ export interface AIAnalysis {
   confidenceScores: Record<string, number>; // FolderID -> Score
   suggestedFolderId: string | 'UNCATEGORIZED';
   tags: string[];
+  transcription?: string;
 }
 
 export interface SavedItem {
@@ -54,7 +55,7 @@ export interface SavedItem {
   ownerName?: string; // Display name/username for UI
   sourceUrl?: string;
   sourcePlatform: 'instagram' | 'direct' | 'upload';
-  imageUrl: string; // Base64 or URL
+  imageUrl?: string; // Base64 or URL (Optional now)
   timestamp: number;
   analysis: AIAnalysis | null;
   userCategory: string; // Use the folder ID or 'UNCATEGORIZED'

@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, LayoutGrid, Filter, Search, Instagram, Bookmark, User as UserIcon, Users, Folder as FolderIcon, HelpCircle, Settings as SettingsIcon, Heart, Share2, Menu, ArrowLeft, Send, Check, X as XIcon, Trash2 } from 'lucide-react';
+import { Plus, LayoutGrid, Filter, Search, Instagram, Bookmark, User as UserIcon, Users, Folder as FolderIcon, HelpCircle, Settings as SettingsIcon, Heart, Share2, Menu, ArrowLeft, Send, Check, X as XIcon, Trash2, Link as LinkIcon } from 'lucide-react';
 import { SavedItem, Category, AppState, Language, Theme, User, Folder } from './types';
-import { analyzeImage } from './services/geminiService';
+import { analyzeContent } from './services/geminiService';
 import { translations } from './utils/translations';
 import { getMockUserItems, MOCK_USERS, MOCK_FRIEND_ITEMS } from './utils/mockData';
 import CategoryBadge from './components/CategoryBadge';
@@ -87,7 +87,6 @@ const App: React.FC = () => {
     if (user && user.friends) {
         user.friends.forEach((friendId: string) => {
              // In a real app, this would fetch from DB. Here we use mocks.
-             // We filter MOCK_FRIEND_ITEMS based on the user's friend list
              const friendContent = MOCK_FRIEND_ITEMS.filter(item => item.ownerId === friendId);
              friendsItems = [...friendsItems, ...friendContent];
         });
@@ -126,7 +125,6 @@ const App: React.FC = () => {
   }, [theme]);
 
   const handleRegister = (username: string) => {
-    // Initialize default system folders as user folders so they can be edited
     const defaultFolders: Folder[] = [
         { id: Category.TRICKS, name: translations[lang].badges[Category.TRICKS], description: "Programming tips, software tricks, gaming guides, and productivity hacks." },
         { id: Category.SHOPPING, name: translations[lang].badges[Category.SHOPPING], description: "Products I want to buy, price comparisons, gadgets, and wishlists." },
@@ -138,23 +136,27 @@ const App: React.FC = () => {
       id: crypto.randomUUID(),
       username,
       friends: [],
-      incomingRequests: [], // Initialize empty
-      outgoingRequests: [], // Initialize empty
+      incomingRequests: [],
+      outgoingRequests: [],
       folders: defaultFolders,
       settings: { enableUncategorized: true, enableFavorites: true }
     };
     setState(prev => ({ ...prev, currentUser: newUser }));
   };
 
-  const handleAddItem = async (file: File, url?: string) => {
+  const handleAddItem = async (file: File | null, url: string) => {
     setIsProcessing(true);
     setIsModalOpen(false);
 
     try {
-      const base64 = await fileToBase64(file);
+      let base64 = null;
+      if (file) {
+        base64 = await fileToBase64(file);
+      }
+      
       const userFolders = state.currentUser?.folders || [];
       
-      const analysis = await analyzeImage(base64, userFolders, lang);
+      const analysis = await analyzeContent(url, base64, userFolders, lang);
       
       let finalCategory = analysis.suggestedFolderId;
 
@@ -164,7 +166,6 @@ const App: React.FC = () => {
           if (state.currentUser?.settings.enableUncategorized) {
               finalCategory = Category.UNCATEGORIZED;
           } else {
-              // Reject item if uncategorized is disabled and no match found
               alert(translations[lang].profile.itemDiscarded);
               setIsProcessing(false);
               return;
@@ -177,7 +178,7 @@ const App: React.FC = () => {
         ownerName: state.currentUser?.username,
         sourceUrl: url,
         sourcePlatform: url?.includes('instagram') ? 'instagram' : 'upload',
-        imageUrl: base64,
+        imageUrl: base64 || undefined, // undefined if no image
         timestamp: Date.now(),
         analysis,
         userCategory: finalCategory,
@@ -192,12 +193,13 @@ const App: React.FC = () => {
       }));
     } catch (error) {
       console.error("Error processing item:", error);
-      alert("Failed to analyze image. Please try again.");
+      alert("Failed to analyze content. Please try again.");
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // ... (keeping other handlers same as previous file: handleUpdateCategory, handleToggleFavorite, Folder Mgmt, Friend Mgmt)
   const handleUpdateCategory = (itemId: string, category: string) => {
     setState(prev => ({
       ...prev,
@@ -224,8 +226,6 @@ const App: React.FC = () => {
       )
     }));
   };
-
-  // --- Folder Management ---
 
   const handleCreateFolder = (name: string, description: string) => {
     if (!state.currentUser) return;
@@ -255,7 +255,6 @@ const App: React.FC = () => {
       const updatedFolders = state.currentUser.folders.filter(f => f.id !== id);
       const updatedUser = { ...state.currentUser, folders: updatedFolders };
       
-      // Move items to Uncategorized
       const updatedItems = state.items.map(item => 
           item.folderId === id 
             ? { ...item, folderId: undefined, userCategory: Category.UNCATEGORIZED } 
@@ -292,8 +291,7 @@ const App: React.FC = () => {
     }));
   };
 
-  // --- Friend Request Logic ---
-
+  // Friend Requests
   const sendFriendRequest = (targetUser: User) => {
       if (!state.currentUser) return;
       const updatedUser = {
@@ -305,16 +303,12 @@ const App: React.FC = () => {
 
   const acceptFriendRequest = (requesterId: string) => {
       if (!state.currentUser) return;
-      
       const updatedUser = {
           ...state.currentUser,
           friends: [...state.currentUser.friends, requesterId],
           incomingRequests: (state.currentUser.incomingRequests || []).filter(id => id !== requesterId)
       };
-
-      // Add mock items for this new friend
       const newFriendItems = getMockUserItems(requesterId);
-
       setState(prev => ({ 
           ...prev, 
           currentUser: updatedUser,
@@ -346,16 +340,12 @@ const App: React.FC = () => {
           ...state.currentUser,
           friends: state.currentUser.friends.filter(id => id !== friendId)
       };
-      // Remove friend's items
       const updatedFriendItems = state.friendsItems.filter(item => item.ownerId !== friendId);
-      
       setState(prev => ({
           ...prev,
           currentUser: updatedUser,
           friendsItems: updatedFriendItems,
       }));
-
-      // Update separate state for selectedFriendId
       if (selectedFriendId === friendId) {
         setSelectedFriendId(null);
       }
@@ -373,12 +363,10 @@ const App: React.FC = () => {
       });
   };
 
-  // --- Folder Context Interactions ---
-
   const handleFolderLongPress = (folder: Folder) => {
       longPressTimer.current = setTimeout(() => {
           setFolderToEdit(folder);
-      }, 500); // 500ms long press
+      }, 500); 
   };
 
   const handleFolderPressEnd = () => {
@@ -393,12 +381,7 @@ const App: React.FC = () => {
       setFolderToEdit(folder);
   };
 
-  // --- Filtering ---
-
   const filteredItems = useMemo(() => {
-    // Determine source
-    // If activeTab is SOCIAL, we only show friends items.
-    // If a friend is selected, we filter by that friend.
     let source = [];
     if (activeTab === 'PERSONAL') {
         source = state.items;
@@ -409,7 +392,6 @@ const App: React.FC = () => {
         }
     }
     
-    // Filter by Category/Folder (Only applies to PERSONAL view)
     if (activeTab === 'PERSONAL' && state.filterCategory !== 'ALL') {
         if (state.filterCategory === 'FAVORITES') {
              source = source.filter(i => i.isFavorite);
@@ -420,7 +402,6 @@ const App: React.FC = () => {
         }
     }
     
-    // Filter by Search (Applies to both)
     if (state.searchQuery) {
       const q = state.searchQuery.toLowerCase();
       source = source.filter(i => 
@@ -437,7 +418,67 @@ const App: React.FC = () => {
     return <Onboarding onComplete={handleRegister} lang={lang} />;
   }
 
-  // --- Render ---
+  // Helper to render card
+  const renderItemCard = (item: SavedItem) => (
+      <div 
+        key={item.id} 
+        className="group relative bg-white dark:bg-neutral-900 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-slate-200 dark:border-neutral-800 cursor-pointer flex flex-col h-full"
+        onClick={() => setSelectedItem(item)}
+      >
+        <div className="aspect-[4/5] relative bg-slate-100 dark:bg-neutral-950 overflow-hidden">
+          {item.imageUrl ? (
+              <img 
+                src={item.imageUrl} 
+                alt="Content" 
+                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                loading="lazy"
+              />
+          ) : (
+              // Placeholder for Text-only items
+              <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-slate-200 to-slate-300 dark:from-neutral-800 dark:to-neutral-900 text-center">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mb-3">
+                     <LinkIcon className="w-6 h-6 text-slate-600 dark:text-neutral-400" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-700 dark:text-neutral-300 line-clamp-3 leading-snug">
+                      {item.analysis?.visualDescription || 'Link Content'}
+                  </h3>
+              </div>
+          )}
+          
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          
+          <div className="absolute top-2 left-2">
+            <CategoryBadge 
+                category={item.userCategory} 
+                customLabel={state.currentUser?.folders.find(f => f.id === item.folderId)?.name}
+            />
+          </div>
+          
+          <button 
+            onClick={(e) => { e.stopPropagation(); handleToggleFavorite(item.id); }}
+            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/20 backdrop-blur-sm hover:bg-red-500/20 transition-colors"
+          >
+              <Heart className={`w-4 h-4 ${item.isFavorite ? 'fill-red-500 text-red-500' : 'text-white'}`} />
+          </button>
+        </div>
+        
+        <div className="p-3 flex-1 flex flex-col">
+          <p className="text-sm font-medium text-slate-800 dark:text-neutral-200 line-clamp-2 leading-snug mb-auto">
+            {item.analysis?.visualDescription || t.modal.analyzing}
+          </p>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 dark:border-neutral-800/50">
+            <span className="text-[10px] text-slate-400 dark:text-neutral-500">
+              {new Date(item.timestamp).toLocaleDateString()}
+            </span>
+             {item.ownerName && item.ownerName !== state.currentUser?.username && (
+                <span className="text-[10px] text-blue-500 dark:text-blue-400 font-medium truncate ml-2">
+                    {item.ownerName}
+                </span>
+             )}
+          </div>
+        </div>
+      </div>
+  );
 
   return (
     <div className="min-h-screen pb-20 sm:pb-0 bg-slate-50 dark:bg-black text-slate-900 dark:text-neutral-50 font-sans transition-colors duration-200">
@@ -446,8 +487,6 @@ const App: React.FC = () => {
       <nav className="sticky top-0 z-30 bg-white/80 dark:bg-black/80 backdrop-blur-md border-b border-slate-200 dark:border-neutral-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            
-            {/* Logo */}
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-black dark:bg-white rounded-lg flex items-center justify-center">
                  <Bookmark className="w-5 h-5 text-white dark:text-black" />
@@ -457,7 +496,6 @@ const App: React.FC = () => {
               </span>
             </div>
 
-            {/* Desktop Search */}
             <div className="hidden sm:flex flex-1 max-w-md mx-8 relative">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 dark:text-neutral-500" />
               <input
@@ -469,9 +507,7 @@ const App: React.FC = () => {
               />
             </div>
 
-            {/* Right Actions */}
             <div className="flex items-center gap-2 sm:gap-4">
-               {/* Settings Button */}
                <button 
                   onClick={() => setIsSettingsOpen(true)}
                   className="p-2 text-slate-500 dark:text-neutral-400 hover:bg-slate-100 dark:hover:bg-neutral-800 rounded-full transition-colors"
@@ -479,7 +515,6 @@ const App: React.FC = () => {
                   <SettingsIcon className="w-6 h-6" />
                </button>
 
-               {/* Profile Button */}
                <button 
                 onClick={() => setIsProfileOpen(true)}
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity"
@@ -495,7 +530,6 @@ const App: React.FC = () => {
             </div>
           </div>
           
-          {/* Mobile Search */}
           <div className="sm:hidden pb-3">
              <div className="relative">
                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 dark:text-neutral-500" />
@@ -511,10 +545,8 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         
-        {/* Tab Switcher */}
         <div className="flex gap-6 mb-6 border-b border-slate-200 dark:border-neutral-800">
            <button 
              onClick={() => setActiveTab('PERSONAL')}
@@ -533,10 +565,8 @@ const App: React.FC = () => {
            </button>
         </div>
 
-        {/* --- PERSONAL TAB CONTENT --- */}
         {activeTab === 'PERSONAL' && (
             <div className="animate-in fade-in duration-300">
-                {/* Folder Filters */}
                 <div className="flex items-center gap-3 mb-6 overflow-x-auto pb-2 scrollbar-hide">
                     <button
                         onClick={() => setState(prev => ({ ...prev, filterCategory: 'ALL' }))}
@@ -599,7 +629,6 @@ const App: React.FC = () => {
                     )}
                 </div>
 
-                {/* Personal Grid */}
                 {filteredItems.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 opacity-50">
                     <LayoutGrid className="w-16 h-16 mb-4 text-slate-300 dark:text-neutral-700" />
@@ -607,58 +636,15 @@ const App: React.FC = () => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {filteredItems.map(item => (
-                      <div 
-                        key={item.id} 
-                        className="group relative bg-white dark:bg-neutral-900 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-slate-200 dark:border-neutral-800 cursor-pointer"
-                        onClick={() => setSelectedItem(item)}
-                      >
-                        <div className="aspect-[4/5] relative bg-slate-100 dark:bg-neutral-950">
-                          <img 
-                            src={item.imageUrl} 
-                            alt="Content" 
-                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                            loading="lazy"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                          
-                          <div className="absolute top-2 left-2">
-                            <CategoryBadge 
-                                category={item.userCategory} 
-                                customLabel={state.currentUser?.folders.find(f => f.id === item.folderId)?.name}
-                            />
-                          </div>
-                          
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleToggleFavorite(item.id); }}
-                            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/20 backdrop-blur-sm hover:bg-red-500/20 transition-colors"
-                          >
-                              <Heart className={`w-4 h-4 ${item.isFavorite ? 'fill-red-500 text-red-500' : 'text-white'}`} />
-                          </button>
-                        </div>
-                        
-                        <div className="p-3">
-                          <p className="text-sm font-medium text-slate-800 dark:text-neutral-200 line-clamp-2 leading-snug">
-                            {item.analysis?.visualDescription || t.modal.analyzing}
-                          </p>
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="text-[10px] text-slate-400 dark:text-neutral-500">
-                              {new Date(item.timestamp).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                    {filteredItems.map(item => renderItemCard(item))}
                   </div>
                 )}
             </div>
         )}
 
-        {/* --- SOCIAL TAB CONTENT --- */}
         {activeTab === 'SOCIAL' && (
             <div className="animate-in fade-in duration-300">
                 {selectedFriendId ? (
-                    // Viewing Specific Friend's Content
                     <div className="mb-6">
                         <button 
                           onClick={() => setSelectedFriendId(null)}
@@ -692,10 +678,54 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                    // Social Dashboard (Lists)
                     <div className="space-y-10 mb-8">
-                        
-                        {/* 1. Pending Requests (Visible if > 0) */}
+                        {/* 1. My Friends */}
+                        <section>
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <Users className="w-4 h-4" />
+                                {t.profile.myFriends} ({state.currentUser.friends.length})
+                            </h3>
+                            {state.currentUser.friends.length === 0 ? (
+                                <div className="p-8 rounded-xl bg-slate-50 dark:bg-neutral-900 border border-dashed border-slate-300 dark:border-neutral-800 text-center flex flex-col items-center gap-3">
+                                    <div className="w-12 h-12 bg-slate-100 dark:bg-neutral-800 rounded-full flex items-center justify-center">
+                                        <Users className="w-6 h-6 text-slate-400 dark:text-neutral-600" />
+                                    </div>
+                                    <p className="text-sm text-slate-500 dark:text-neutral-500">
+                                        {t.profile.noFriends}
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                    {state.currentUser.friends.map(id => {
+                                        const friend = Object.values(MOCK_USERS).find(u => u.id === id) || { username: id, avatar: '' };
+                                        return (
+                                            <div 
+                                                key={id} 
+                                                onClick={() => setSelectedFriendId(id)}
+                                                className="flex flex-col items-center gap-3 p-4 rounded-xl bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 hover:border-blue-500 dark:hover:border-blue-500 cursor-pointer transition-all hover:shadow-md group relative"
+                                            >
+                                                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 p-[2px]">
+                                                    <div className="w-full h-full rounded-full bg-white dark:bg-black flex items-center justify-center overflow-hidden">
+                                                        {friend.avatar ? (
+                                                            <img src={friend.avatar} alt="Profile" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="font-bold text-xl text-slate-700 dark:text-neutral-200">
+                                                                {friend.username.substring(1, 2).toUpperCase()}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <span className="font-medium text-slate-900 dark:text-white truncate w-full text-center">
+                                                    {friend.username}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </section>
+
+                        {/* 2. Pending Requests */}
                         {(state.currentUser.incomingRequests?.length || 0) > 0 && (
                             <section>
                                 <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2 text-orange-500">
@@ -751,7 +781,7 @@ const App: React.FC = () => {
                             </section>
                         )}
 
-                        {/* 2. Sent Requests (Visible if > 0) */}
+                        {/* 3. Sent Requests */}
                         {(state.currentUser.outgoingRequests?.length || 0) > 0 && (
                              <section>
                                 <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2 text-slate-500">
@@ -796,52 +826,6 @@ const App: React.FC = () => {
                              </section>
                         )}
                         
-                        {/* 3. My Friends */}
-                        <section>
-                            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-                                <Users className="w-4 h-4" />
-                                {t.profile.myFriends} ({state.currentUser.friends.length})
-                            </h3>
-                            {state.currentUser.friends.length === 0 ? (
-                                <div className="p-8 rounded-xl bg-slate-50 dark:bg-neutral-900 border border-dashed border-slate-300 dark:border-neutral-800 text-center flex flex-col items-center gap-3">
-                                    <div className="w-12 h-12 bg-slate-100 dark:bg-neutral-800 rounded-full flex items-center justify-center">
-                                        <Users className="w-6 h-6 text-slate-400 dark:text-neutral-600" />
-                                    </div>
-                                    <p className="text-sm text-slate-500 dark:text-neutral-500">
-                                        {t.profile.noFriends}
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                    {state.currentUser.friends.map(id => {
-                                        const friend = Object.values(MOCK_USERS).find(u => u.id === id) || { username: id, avatar: '' };
-                                        return (
-                                            <div 
-                                                key={id} 
-                                                onClick={() => setSelectedFriendId(id)}
-                                                className="flex flex-col items-center gap-3 p-4 rounded-xl bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 hover:border-blue-500 dark:hover:border-blue-500 cursor-pointer transition-all hover:shadow-md group relative"
-                                            >
-                                                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 p-[2px]">
-                                                    <div className="w-full h-full rounded-full bg-white dark:bg-black flex items-center justify-center overflow-hidden">
-                                                        {friend.avatar ? (
-                                                            <img src={friend.avatar} alt="Profile" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <span className="font-bold text-xl text-slate-700 dark:text-neutral-200">
-                                                                {friend.username.substring(1, 2).toUpperCase()}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <span className="font-medium text-slate-900 dark:text-white truncate w-full text-center">
-                                                    {friend.username}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </section>
-
                         <div className="border-t border-slate-200 dark:border-neutral-800 pt-8">
                            <p className="text-center text-slate-500 dark:text-neutral-500 text-sm italic">
                                {t.profile.selectFriendPrompt}
@@ -850,7 +834,7 @@ const App: React.FC = () => {
                     </div>
                 )}
 
-                {/* Social Grid (Filtered by Selected Friend) */}
+                {/* Friend Grid */}
                 {selectedFriendId && (
                      filteredItems.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 opacity-50 bg-slate-50 dark:bg-neutral-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-neutral-800">
@@ -859,46 +843,7 @@ const App: React.FC = () => {
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-in slide-in-from-bottom-4 duration-500">
-                            {filteredItems.map(item => (
-                            <div 
-                                key={item.id} 
-                                className="group relative bg-white dark:bg-neutral-900 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-slate-200 dark:border-neutral-800 cursor-pointer"
-                                onClick={() => setSelectedItem(item)}
-                            >
-                                <div className="aspect-[4/5] relative bg-slate-100 dark:bg-neutral-950">
-                                <img 
-                                    src={item.imageUrl} 
-                                    alt="Content" 
-                                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                                    loading="lazy"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                
-                                {/* Owner Avatar Overlay */}
-                                {item.ownerName && (
-                                    <div className="absolute bottom-2 left-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white">
-                                            {item.ownerName.substring(1, 2).toUpperCase()}
-                                        </div>
-                                        <span className="text-xs font-medium text-white shadow-black drop-shadow-md">
-                                            {item.ownerName}
-                                        </span>
-                                    </div>
-                                )}
-                                </div>
-                                
-                                <div className="p-3">
-                                <p className="text-sm font-medium text-slate-800 dark:text-neutral-200 line-clamp-2 leading-snug">
-                                    {item.analysis?.visualDescription || t.modal.analyzing}
-                                </p>
-                                <div className="flex items-center justify-between mt-2">
-                                    <span className="text-[10px] text-slate-400 dark:text-neutral-500">
-                                    {new Date(item.timestamp).toLocaleDateString()}
-                                    </span>
-                                </div>
-                                </div>
-                            </div>
-                            ))}
+                            {filteredItems.map(item => renderItemCard(item))}
                         </div>
                     )
                 )}

@@ -9,12 +9,16 @@ const analysisSchema = {
   properties: {
     visualDescription: {
       type: Type.STRING,
-      description: "A concise summary of what is happening visually in the image or video frame.",
+      description: "Title or concise summary of the content (e.g., 'Chocolate Muffin Recipe', 'React Tutorial').",
     },
     extractedTexts: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
-      description: "Any visible text extracted via OCR from the image.",
+      description: "Extracted details like Ingredients, Steps, or Key Points from the content.",
+    },
+    transcription: {
+      type: Type.STRING,
+      description: "A simulated transcription of the audio content if applicable (e.g. for videos).",
     },
     detectedEntities: {
       type: Type.ARRAY,
@@ -22,13 +26,12 @@ const analysisSchema = {
         type: Type.OBJECT,
         properties: {
           name: { type: Type.STRING },
-          type: { type: Type.STRING, description: "Type of entity (Product, Place, Technology, Actor, etc.)" },
-          meta: { type: Type.STRING, description: "Extra info like price, rating, or address if visible." },
+          type: { type: Type.STRING, description: "Type of entity (Product, Place, Technology, Actor, Author, etc.)" },
+          meta: { type: Type.STRING, description: "Extra info like price, rating, address, or username." },
         },
         required: ["name", "type"],
       },
     },
-    // CHANGED: Use ARRAY of objects instead of Map/Object to avoid schema validation errors with dynamic keys
     confidenceScores: {
       type: Type.ARRAY,
       description: "List of confidence scores for each folder.",
@@ -43,19 +46,20 @@ const analysisSchema = {
     },
     suggestedFolderId: {
       type: Type.STRING,
-      description: "The ID of the folder that best matches the content based on the provided folder descriptions. Returns 'UNCATEGORIZED' if no good match found.",
+      description: "The ID of the folder that best matches the content. Returns 'UNCATEGORIZED' if no match.",
     },
     tags: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
-      description: "5-7 relevant SEO tags for searchability.",
+      description: "5-7 relevant SEO tags.",
     },
   },
   required: ["visualDescription", "suggestedFolderId", "detectedEntities", "tags"],
 };
 
-export const analyzeImage = async (
-    base64Image: string, 
+export const analyzeContent = async (
+    url: string,
+    base64Image: string | null,
     availableFolders: Folder[], 
     language: Language = 'es'
 ): Promise<AIAnalysis> => {
@@ -65,47 +69,65 @@ export const analyzeImage = async (
 
     const ai = new GoogleGenAI({ apiKey });
     
-    // Remove header if present
-    const cleanBase64 = base64Image.split(',')[1] || base64Image;
-
     // Construct the context of available folders for the AI
     const folderContext = availableFolders.map(f => 
       `- Folder ID: "${f.id}"\n  Name: "${f.name}"\n  Description: "${f.description}"`
     ).join('\n\n');
 
     const langInstruction = language === 'es' 
-      ? "RESPOND IN SPANISH (ESPAÑOL) for Description, Tags, and Entity details." 
+      ? "RESPOND IN SPANISH (ESPAÑOL) for Description, Transcription, Tags, and Entity details." 
       : "RESPOND IN ENGLISH.";
 
-    const promptText = `
-      Analyze this social media screenshot/image.
-      
-      I have the following folders organized by the user:
-      ${folderContext}
+    let promptText = "";
+    let parts: any[] = [];
 
-      Task:
-      1. Analyze the visual content and extracted text.
-      2. Compare it against the definitions of the folders provided above.
-      3. Assign the content to the BEST matching Folder ID.
-      4. If the content does not fit well into ANY of the described folders (confidence < 0.6), return "UNCATEGORIZED" as the suggestedFolderId.
-      5. Provide a confidence score (0.0 to 1.0) for each Folder ID in the confidenceScores list.
+    if (base64Image) {
+        // Image Analysis Logic
+        const cleanBase64 = base64Image.split(',')[1] || base64Image;
+        promptText = `
+          Analyze this social media screenshot/image.
+          
+          Folders Context:
+          ${folderContext}
 
-      ${langInstruction}
-    `;
+          Task:
+          1. Analyze the visual content.
+          2. Assign to BEST matching Folder ID based on description.
+          3. If confidence < 0.6, use "UNCATEGORIZED".
+          4. Extract text and entities.
+
+          ${langInstruction}
+        `;
+        parts = [
+            { inlineData: { mimeType: "image/jpeg", data: cleanBase64 } },
+            { text: promptText }
+        ];
+    } else {
+        // URL/Text Analysis Logic (Simulation)
+        promptText = `
+          Analyze this URL content: "${url}"
+          
+          Since I cannot browse the live web, analyze the URL structure, keywords, and imply the likely content.
+          Simulate a scraping result for this link. 
+          
+          Folders Context:
+          ${folderContext}
+
+          Task:
+          1. Generate a likely "Title" for this content (put in visualDescription).
+          2. Extract/Simulate likely Author, Ingredients (if food), Steps (if tutorial), or Key Points (put in extractedTexts).
+          3. Simulate a short "Audio Transcription" if it seems like a video (put in transcription).
+          4. Assign to BEST matching Folder ID.
+          5. If confidence < 0.6, use "UNCATEGORIZED".
+
+          ${langInstruction}
+        `;
+        parts = [{ text: promptText }];
+    }
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: "image/jpeg",
-              data: cleanBase64,
-            },
-          },
-          { text: promptText },
-        ],
-      },
+      contents: { parts },
       config: {
         responseMimeType: "application/json",
         responseSchema: analysisSchema,
@@ -136,14 +158,14 @@ export const analyzeImage = async (
     return result;
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
-    // Return a fallback structure
     return {
-      visualDescription: language === 'es' ? "Falló el análisis. Intente nuevamente." : "Analysis failed. Please try again.",
+      visualDescription: language === 'es' ? "Análisis fallido. URL procesada sin datos." : "Analysis failed. URL processed with no data.",
       extractedTexts: [],
       detectedEntities: [],
       confidenceScores: { 'UNCATEGORIZED': 1 },
       suggestedFolderId: 'UNCATEGORIZED',
       tags: [],
+      transcription: ""
     };
   }
 };
