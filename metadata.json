@@ -1,0 +1,7 @@
+{
+  "name": "Saved",
+  "description": "An intelligent social media content organizer powered by Gemini 2.5. Automatically categorizes, analyzes, and enriches your saved content.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
