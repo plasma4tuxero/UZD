@@ -1,8 +1,7 @@
 
-
 import React, { useState, useRef } from 'react';
-import { X, UserPlus, Users, Search, CheckCircle, FolderPlus, Folder as FolderIcon, Trash2, Settings, Moon, Sun, Globe, Upload, AlertTriangle, ToggleLeft, ToggleRight, Edit2, Save } from 'lucide-react';
-import { User, Language, Theme, Folder } from '../types';
+import { X, UserPlus, Users, Search, CheckCircle, FolderPlus, Folder as FolderIcon, Trash2, Upload, AlertTriangle, ToggleLeft, ToggleRight, Edit2, Save, Heart } from 'lucide-react';
+import { User, Language, Folder } from '../types';
 import { translations } from '../utils/translations';
 import { findMockUser } from '../utils/mockData';
 
@@ -16,28 +15,26 @@ interface Props {
   onUpdateFolder: (id: string, name: string, description: string) => void;
   onUpdateAvatar: (file: File) => void;
   onToggleUncategorized: (enabled: boolean) => void;
+  onToggleFavoritesVisibility: (enabled: boolean) => void;
+  onRemoveFriend: (friendId: string) => void;
   lang: Language;
-  theme: Theme;
-  onToggleTheme: () => void;
-  onToggleLang: () => void;
 }
 
-type Tab = 'FRIENDS' | 'FOLDERS' | 'SETTINGS';
+type Tab = 'FRIENDS' | 'FOLDERS';
 
 const ProfileModal: React.FC<Props> = ({ 
   isOpen, 
   onClose, 
   currentUser, 
   onAddFriend, 
-  onCreateFolder,
+  onCreateFolder, 
   onDeleteFolder,
   onUpdateFolder,
   onUpdateAvatar,
   onToggleUncategorized,
+  onToggleFavoritesVisibility,
+  onRemoveFriend,
   lang,
-  theme,
-  onToggleTheme,
-  onToggleLang
 }) => {
   const [activeTab, setActiveTab] = useState<Tab>('FOLDERS');
   const [friendSearch, setFriendSearch] = useState('');
@@ -128,7 +125,7 @@ const ProfileModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/90 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/90 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white dark:bg-neutral-900 w-full max-w-md rounded-2xl border border-slate-200 dark:border-neutral-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header */}
@@ -166,22 +163,16 @@ const ProfileModal: React.FC<Props> = ({
         {/* Tabs */}
         <div className="flex border-b border-slate-100 dark:border-neutral-800">
           <button 
-            onClick={() => setActiveTab('FRIENDS')}
-            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'FRIENDS' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 dark:text-neutral-500 hover:text-slate-800 dark:hover:text-neutral-300'}`}
-          >
-            {t.profile.tabs.friends}
-          </button>
-          <button 
             onClick={() => setActiveTab('FOLDERS')}
             className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'FOLDERS' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 dark:text-neutral-500 hover:text-slate-800 dark:hover:text-neutral-300'}`}
           >
             {t.profile.tabs.folders}
           </button>
           <button 
-            onClick={() => setActiveTab('SETTINGS')}
-            className={`flex-none px-5 py-3 border-b-2 transition-colors flex items-center justify-center ${activeTab === 'SETTINGS' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 dark:text-neutral-500 hover:text-slate-800 dark:hover:text-neutral-300'}`}
+            onClick={() => setActiveTab('FRIENDS')}
+            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'FRIENDS' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 dark:text-neutral-500 hover:text-slate-800 dark:hover:text-neutral-300'}`}
           >
-             <Settings className="w-5 h-5" />
+            {t.profile.tabs.friends}
           </button>
         </div>
 
@@ -189,7 +180,7 @@ const ProfileModal: React.FC<Props> = ({
           
           {/* FRIENDS TAB */}
           {activeTab === 'FRIENDS' && (
-            <div className="space-y-6">
+            <div className="space-y-6 animate-in slide-in-from-right-2 duration-300">
                <div className="bg-slate-50 dark:bg-neutral-800/50 p-4 rounded-xl border border-slate-200 dark:border-neutral-800">
                 <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
                   <UserPlus className="w-4 h-4" />
@@ -234,10 +225,16 @@ const ProfileModal: React.FC<Props> = ({
                     currentUser.friends.map(friendId => (
                         <div key={friendId} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-neutral-800/30 border border-slate-100 dark:border-neutral-800">
                           <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-neutral-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-neutral-300">
-                            F
+                            {friendId.substring(0, 1).toUpperCase()}
                           </div>
                           <span className="text-sm font-medium text-slate-700 dark:text-neutral-200">{friendId}</span>
-                          <CheckCircle className="w-4 h-4 text-green-500 ml-auto" />
+                          <button 
+                             onClick={() => onRemoveFriend(friendId)}
+                             className="ml-auto p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                             title="Remove Friend"
+                          >
+                             <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                     ))
                   )}
@@ -248,7 +245,7 @@ const ProfileModal: React.FC<Props> = ({
 
           {/* FOLDERS TAB */}
           {activeTab === 'FOLDERS' && (
-            <div className="space-y-6">
+            <div className="space-y-6 animate-in slide-in-from-left-2 duration-300">
               
               {/* Uncategorized Toggle */}
               <div className={`p-4 rounded-xl border transition-all ${currentUser.settings.enableUncategorized ? 'bg-slate-50 dark:bg-neutral-800/50 border-slate-200 dark:border-neutral-800' : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30'}`}>
@@ -266,6 +263,27 @@ const ProfileModal: React.FC<Props> = ({
                         className={`text-2xl transition-colors ${currentUser.settings.enableUncategorized ? 'text-blue-500' : 'text-slate-400'}`}
                      >
                          {currentUser.settings.enableUncategorized ? <ToggleRight className="w-10 h-10" /> : <ToggleLeft className="w-10 h-10" />}
+                     </button>
+                  </div>
+              </div>
+
+              {/* Favorites Toggle */}
+              <div className={`p-4 rounded-xl border transition-all ${currentUser.settings.enableFavorites ? 'bg-slate-50 dark:bg-neutral-800/50 border-slate-200 dark:border-neutral-800' : 'bg-slate-100 dark:bg-neutral-900/30 border-slate-200 dark:border-neutral-800'}`}>
+                  <div className="flex items-start justify-between">
+                     <div>
+                         <h4 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                             <Heart className="w-3.5 h-3.5" />
+                             {t.profile.favoritesTitle}
+                         </h4>
+                         <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1 max-w-[200px]">
+                             {t.profile.favoritesDesc}
+                         </p>
+                     </div>
+                     <button 
+                        onClick={() => onToggleFavoritesVisibility(!currentUser.settings.enableFavorites)}
+                        className={`text-2xl transition-colors ${currentUser.settings.enableFavorites ? 'text-blue-500' : 'text-slate-400'}`}
+                     >
+                         {currentUser.settings.enableFavorites ? <ToggleRight className="w-10 h-10" /> : <ToggleLeft className="w-10 h-10" />}
                      </button>
                   </div>
               </div>
@@ -373,60 +391,6 @@ const ProfileModal: React.FC<Props> = ({
                    )}
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* SETTINGS TAB */}
-          {activeTab === 'SETTINGS' && (
-            <div className="space-y-6">
-               <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                  <Settings className="w-4 h-4" />
-                  {t.profile.settingsTitle}
-               </h4>
-
-               {/* Theme Toggle */}
-               <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-neutral-800/50 border border-slate-200 dark:border-neutral-800">
-                  <div className="flex items-center gap-3">
-                     {theme === 'dark' ? <Moon className="w-5 h-5 text-purple-500" /> : <Sun className="w-5 h-5 text-orange-500" />}
-                     <div>
-                       <p className="font-medium text-slate-900 dark:text-white text-sm">{t.profile.theme}</p>
-                       <p className="text-xs text-slate-500 dark:text-neutral-500">
-                         {theme === 'dark' ? t.profile.darkMode : t.profile.lightMode}
-                       </p>
-                     </div>
-                  </div>
-                  <button 
-                    onClick={onToggleTheme}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${theme === 'dark' ? 'bg-blue-600' : 'bg-slate-300'}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${theme === 'dark' ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
-               </div>
-
-               {/* Language Toggle */}
-               <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-neutral-800/50 border border-slate-200 dark:border-neutral-800">
-                  <div className="flex items-center gap-3">
-                     <Globe className="w-5 h-5 text-blue-500" />
-                     <div>
-                       <p className="font-medium text-slate-900 dark:text-white text-sm">{t.profile.language}</p>
-                       <p className="text-xs text-slate-500 dark:text-neutral-500">
-                         {lang === 'es' ? t.profile.spanish : t.profile.english}
-                       </p>
-                     </div>
-                  </div>
-                  <button 
-                    onClick={onToggleLang}
-                    className="px-3 py-1.5 text-xs font-bold bg-white dark:bg-neutral-700 border border-slate-200 dark:border-neutral-600 rounded-lg shadow-sm"
-                  >
-                    {lang.toUpperCase()}
-                  </button>
-               </div>
-
-               <div className="pt-4 mt-8 border-t border-slate-100 dark:border-neutral-800">
-                 <p className="text-center text-xs text-slate-400 dark:text-neutral-600">
-                   MindVault v1.1.0 • Built with Gemini
-                 </p>
-               </div>
             </div>
           )}
 

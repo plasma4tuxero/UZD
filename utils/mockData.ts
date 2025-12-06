@@ -7,21 +7,21 @@ export const MOCK_USERS: Record<string, User> = {
     username: '@alex_tech', 
     friends: [], 
     folders: [],
-    settings: { enableUncategorized: true }
+    settings: { enableUncategorized: true, enableFavorites: true }
   },
   'user_2': { 
     id: 'user_2', 
     username: '@maria_eats', 
     friends: [], 
     folders: [],
-    settings: { enableUncategorized: true }
+    settings: { enableUncategorized: true, enableFavorites: true }
   },
   'user_3': { 
     id: 'user_3', 
     username: '@cinephile_joe', 
     friends: [], 
     folders: [],
-    settings: { enableUncategorized: true }
+    settings: { enableUncategorized: true, enableFavorites: true }
   },
 };
 

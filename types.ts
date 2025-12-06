@@ -19,6 +19,7 @@ export interface Folder {
 
 export interface UserSettings {
   enableUncategorized: boolean;
+  enableFavorites: boolean;
 }
 
 export interface User {
@@ -26,6 +27,8 @@ export interface User {
   username: string; // Must start with @
   avatar?: string;
   friends: string[]; // List of user IDs
+  incomingRequests?: string[];
+  outgoingRequests?: string[];
   folders: Folder[]; // All folders (system defaults + custom)
   settings: UserSettings;
 }

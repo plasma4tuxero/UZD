@@ -1,5 +1,4 @@
 
-
 import { Category } from "../types";
 
 export type Language = 'en' | 'es';
@@ -70,6 +69,9 @@ export const translations = {
         settings: 'Settings'
       },
       friends: 'Friends',
+      myFriends: 'My Friends',
+      pendingRequests: 'Pending Requests',
+      sentRequests: 'Sent Requests',
       addFriend: 'Add Friend',
       addPlaceholder: 'Enter @username',
       addBtn: 'Add',
@@ -93,11 +95,24 @@ export const translations = {
       avatarChange: 'Change Photo',
       uncategorizedTitle: 'Unclassified Folder',
       uncategorizedDesc: 'Keep a folder for items that don\'t fit anywhere else.',
+      favoritesTitle: 'Favorites Folder',
+      favoritesDesc: 'Quick access filter for your favorite items.',
       warningTitle: 'Disable Unclassified Folder?',
       warningDesc: 'WARNING: If you disable this, any content that the AI cannot match to your existing folders will be DISCARDED and NOT SAVED. Are you sure?',
       confirmDisable: 'Yes, Disable and Risk Data Loss',
       cancel: 'Cancel',
-      itemDiscarded: 'Item discarded: No matching folder and Unclassified is disabled.'
+      itemDiscarded: 'Item discarded: No matching folder and Unclassified is disabled.',
+      selectFriendPrompt: 'Select a friend to view their shared collection',
+      viewingFriend: 'Viewing collection of',
+      backToAll: 'Back to all friends'
+    },
+    folderEdit: {
+      title: 'Edit Folder',
+      nameLabel: 'Folder Name',
+      descLabel: 'Description',
+      save: 'Update',
+      delete: 'Delete',
+      deleteConfirm: 'Are you sure you want to delete this folder? All items inside will be unclassified.'
     }
   },
   es: {
@@ -165,6 +180,9 @@ export const translations = {
         settings: 'Ajustes'
       },
       friends: 'Amigos',
+      myFriends: 'Mis Amigos',
+      pendingRequests: 'Solicitudes Pendientes',
+      sentRequests: 'Solicitudes Enviadas',
       addFriend: 'Añadir Amigo',
       addPlaceholder: 'Escribe @usuario',
       addBtn: 'Añadir',
@@ -188,11 +206,24 @@ export const translations = {
       avatarChange: 'Cambiar Foto',
       uncategorizedTitle: 'Carpeta Sin Clasificar',
       uncategorizedDesc: 'Mantiene una carpeta para contenido que no encaja en ningún otro lugar.',
+      favoritesTitle: 'Carpeta Favoritos',
+      favoritesDesc: 'Acceso rápido a tus ítems marcados como favoritos.',
       warningTitle: '¿Desactivar carpeta Sin Clasificar?',
       warningDesc: 'ADVERTENCIA: Si desactivas esto, cualquier contenido que la IA no pueda asignar a tus carpetas existentes será DESCARTADO y NO SE GUARDARÁ. ¿Estás seguro?',
       confirmDisable: 'Sí, desactivar y arriesgar pérdida',
       cancel: 'Cancelar',
-      itemDiscarded: 'Ítem descartado: No hay carpeta coincidente y "Sin Clasificar" está desactivado.'
+      itemDiscarded: 'Ítem descartado: No hay carpeta coincidente y "Sin Clasificar" está desactivado.',
+      selectFriendPrompt: 'Selecciona un amigo para ver su colección compartida',
+      viewingFriend: 'Viendo colección de',
+      backToAll: 'Volver a todos'
+    },
+    folderEdit: {
+      title: 'Editar Carpeta',
+      nameLabel: 'Nombre de Carpeta',
+      descLabel: 'Descripción',
+      save: 'Actualizar',
+      delete: 'Eliminar',
+      deleteConfirm: '¿Estás seguro de querer eliminar esta carpeta? Todos los ítems dentro quedarán sin clasificar.'
     }
   }
 };

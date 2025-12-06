@@ -28,11 +28,18 @@ const analysisSchema = {
         required: ["name", "type"],
       },
     },
-    // We return a map of ID -> Score. The keys are dynamic strings (folder IDs).
+    // CHANGED: Use ARRAY of objects instead of Map/Object to avoid schema validation errors with dynamic keys
     confidenceScores: {
-      type: Type.OBJECT,
-      description: "Key-Value pair where Key is the Folder ID and Value is a number (0-1) representing confidence.",
-      nullable: true
+      type: Type.ARRAY,
+      description: "List of confidence scores for each folder.",
+      items: {
+          type: Type.OBJECT,
+          properties: {
+              folderId: { type: Type.STRING },
+              score: { type: Type.NUMBER }
+          },
+          required: ["folderId", "score"]
+      }
     },
     suggestedFolderId: {
       type: Type.STRING,
@@ -81,7 +88,7 @@ export const analyzeImage = async (
       2. Compare it against the definitions of the folders provided above.
       3. Assign the content to the BEST matching Folder ID.
       4. If the content does not fit well into ANY of the described folders (confidence < 0.6), return "UNCATEGORIZED" as the suggestedFolderId.
-      5. Provide a confidence score (0.0 to 1.0) for each Folder ID in the confidenceScores object.
+      5. Provide a confidence score (0.0 to 1.0) for each Folder ID in the confidenceScores list.
 
       ${langInstruction}
     `;
@@ -109,14 +116,24 @@ export const analyzeImage = async (
     const text = response.text;
     if (!text) throw new Error("No response from Gemini");
 
-    const result = JSON.parse(text);
+    const rawResult = JSON.parse(text);
 
-    // Ensure confidenceScores exists even if AI omitted it
-    if (!result.confidenceScores) {
-        result.confidenceScores = {};
+    // Transform array back to object for app consumption
+    const confidenceScoresRecord: Record<string, number> = {};
+    if (Array.isArray(rawResult.confidenceScores)) {
+        rawResult.confidenceScores.forEach((item: any) => {
+            if (item.folderId && typeof item.score === 'number') {
+                confidenceScoresRecord[item.folderId] = item.score;
+            }
+        });
     }
 
-    return result as AIAnalysis;
+    const result: AIAnalysis = {
+        ...rawResult,
+        confidenceScores: confidenceScoresRecord
+    };
+
+    return result;
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
     // Return a fallback structure
